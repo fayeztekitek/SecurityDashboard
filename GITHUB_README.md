@@ -207,27 +207,84 @@ For detailed export instructions, see [DATA_EXTRACTION_GUIDE.txt](DATA_EXTRACTIO
 
 ---
 
-## 📥 Fortify SSC Integration
+## 📥 Real Data Integration
 
-### Option 1: Manual Export
-1. Log into Fortify SSC
-2. Navigate to Reports → Vulnerability Report
-3. Filter all applications, all severities, last 90 days
-4. Export as CSV
-5. Map fields using guide in [DATA_EXTRACTION_GUIDE.txt](DATA_EXTRACTION_GUIDE.txt)
-6. Import to dashboard
+Inject real vulnerability data from your security scanning tools directly into the dashboard!
 
-### Option 2: Automated Script
+### Supported Data Sources
+
+| Tool | Type | Integration |
+|------|------|-------------|
+| **Fortify SSC** | Application vulnerabilities (SAST) | [Guide](docs/integration/FORTIFY_DATA_INTEGRATION.txt) |
+| **Nexus IQ** | Dependency vulnerabilities (SCA) | [Guide](docs/integration/NEXUS_IQ_DATA_INTEGRATION.txt) |
+| **DevOps-Sec** | Aggregated security data | [Guide](docs/integration/DEVOPS_SEC_DATA_INTEGRATION.txt) |
+| **All Combined** | Complete vulnerability picture | [Master Guide](docs/integration/MASTER_DATA_INTEGRATION.txt) |
+
+### Quick Start (5 minutes)
+
+**Option 1: Manual Export (Easiest)**
 ```bash
+# 1. Export CSV from Fortify/Nexus/DevOps-Sec
+# 2. Open dashboard_live_demo.html in browser
+# 3. Click "Import CSV File"
+# 4. Select your file
+# 5. Done! Dashboard updates with real data
+```
+
+**Option 2: Automated API (Recommended)**
+```bash
+# Extract from Fortify
 python3 extract_fortify_data.py \
     --fortify-url https://soft-security.vermeg.com/ssc \
     --token YOUR_FORTIFY_API_TOKEN \
-    --output fortify_export.csv \
-    --days 90
+    --output vulnerabilities.csv
+
+# Extract from Nexus IQ
+python3 extract_nexus_iq_data.py \
+    --nexus-url https://soft-security.vermeg.com:8070 \
+    --username YOUR_USERNAME \
+    --password YOUR_PASSWORD \
+    --output nexus_vulnerabilities.csv
+
+# Import to dashboard
+# Open dashboard in browser → Import CSV File
 ```
 
-### Option 3: Scheduled Export
-Set up daily/weekly Fortify scheduled reports and use the Python script to auto-convert to dashboard format.
+**Option 3: Fully Automated Daily Pipeline (Enterprise)**
+```bash
+# See Master Integration Guide for complete setup
+# Results: Fresh data every morning at 7 AM
+```
+
+### Integration Guides
+
+Complete step-by-step guides are available in `/docs/integration/`:
+
+1. **[FORTIFY_DATA_INTEGRATION.txt](docs/integration/FORTIFY_DATA_INTEGRATION.txt)** (14 KB)
+   - Manual export from Fortify SSC UI
+   - Automated API extraction with Python
+   - Scheduled daily exports
+   - Troubleshooting guide
+
+2. **[NEXUS_IQ_DATA_INTEGRATION.txt](docs/integration/NEXUS_IQ_DATA_INTEGRATION.txt)** (16 KB)
+   - Manual export from Nexus IQ
+   - API-based extraction
+   - CLI scanning and parsing
+   - Integration with Fortify data
+
+3. **[DEVOPS_SEC_DATA_INTEGRATION.txt](docs/integration/DEVOPS_SEC_DATA_INTEGRATION.txt)** (16 KB)
+   - Extract from devops-sec.vermeg.com
+   - API integration
+   - Web scraping fallback
+   - Data aggregation
+
+4. **[MASTER_DATA_INTEGRATION.txt](docs/integration/MASTER_DATA_INTEGRATION.txt)** (18 KB)
+   - Combine all three data sources
+   - Deduplication and validation
+   - Automated daily pipeline
+   - Production deployment
+
+See [docs/integration/README.md](docs/integration/README.md) for complete index and comparison.
 
 ---
 

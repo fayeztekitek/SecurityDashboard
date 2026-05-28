@@ -1,0 +1,501 @@
+================================================================================
+DEVOPS-SEC PORTAL - DATA INTEGRATION GUIDE
+Extracting Vulnerability Data from devops-sec.vermeg.com
+================================================================================
+
+OVERVIEW
+========
+The devops-sec portal aggregates security data from multiple scanners and systems.
+This guide shows how to extract and integrate that data into your dashboard.
+
+URL: https://devops-sec.vermeg.com/
+Status: No login required (READONLY mode)
+
+================================================================================
+STEP 1: UNDERSTAND DEVOPS-SEC PORTAL STRUCTURE
+================================================================================
+
+The portal typically displays:
+
+Dashboard Sections:
+✓ Overall Vulnerability Summary
+✓ Critical Issues Timeline
+✓ Product Risk Matrix
+✓ SLA Compliance Status
+✓ Remediation Progress
+✓ Client Exposure Heat Map
+✓ Security Alerts
+✓ Integration Status
+
+Key Pages to Check:
+
+1. MAIN DASHBOARD
+   URL: https://devops-sec.vermeg.com/
+   Shows: Overview, KPIs, trend graphs
+   
+2. VULNERABILITIES PAGE
+   URL: https://devops-sec.vermeg.com/vulnerabilities
+   Shows: Full vulnerability list, filters, details
+   
+3. PRODUCTS PAGE
+   URL: https://devops-sec.vermeg.com/products
+   Shows: Products, risk levels, vulnerability counts
+   
+4. REPORTS PAGE
+   URL: https://devops-sec.vermeg.com/reports
+   Shows: Generated reports, exports, analytics
+
+5. INTEGRATION PAGE
+   URL: https://devops-sec.vermeg.com/integrations
+   Shows: Connected systems (Fortify, Nexus IQ, etc.)
+
+================================================================================
+STEP 2: AUTOMATED DATA EXTRACTION FROM DEVOPS-SEC
+================================================================================
+
+STEP 2.1: Identify Available APIs
+   
+   Check if devops-sec.vermeg.com has API endpoints:
+   
+   Try accessing:
+   https://devops-sec.vermeg.com/api/
+   https://devops-sec.vermeg.com/api/vulnerabilities
+   https://devops-sec.vermeg.com/api/products
+   https://devops-sec.vermeg.com/api/reports
+   
+   If accessible, you can extract data programmatically
+
+STEP 2.2: Check for Export Features
+   
+   Look for export buttons on pages:
+   1. Navigate to https://devops-sec.vermeg.com/vulnerabilities
+   2. Look for "Export" or "Download" button
+   3. Select format (CSV, JSON, Excel)
+   4. Click to download
+   5. Save file: devops_sec_vulnerabilities.csv
+
+STEP 2.3: Web Scraping (If no API/Export)
+   
+   If no direct export, use Python web scraping:
+   
+```python
+#!/usr/bin/env python3
+"""
+DevOps-Sec Portal Data Extractor
+Scrapes vulnerability data from devops-sec.vermeg.com
+"""
+
+import requests
+from bs4 import BeautifulSoup
+import csv
+import re
+from datetime import datetime
+
+class DevopsSecExtractor:
+    def __init__(self):
+        self.base_url = "https://devops-sec.vermeg.com"
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Security Dashboard Collector)'
+        })
+    
+    def get_vulnerabilities(self):
+        """Fetch vulnerabilities from portal"""
+        try:
+            print("[*] Fetching vulnerabilities from devops-sec...")
+            resp = self.session.get(f"{self.base_url}/vulnerabilities")
+            resp.raise_for_status()
+            
+            soup = BeautifulSoup(resp.content, 'html.parser')
+            
+            vulns = []
+            
+            # Find vulnerability tables or cards
+            # Adjust selectors based on actual page structure
+            vuln_rows = soup.find_all('tr', class_='vulnerability-row')
+            
+            for i, row in enumerate(vuln_rows, 1):
+                try:
+                    # Extract data from table cells
+                    cells = row.find_all('td')
+                    
+                    vuln = {
+                        'Vuln_ID': f"VUL-{datetime.now().year}-{i:04d}",
+                        'CVE': self._extract_text(cells, 1),  # Adjust index
+                        'Severity': self._extract_text(cells, 2),
+                        'Product': self._extract_text(cells, 3),
+                        'Component': self._extract_text(cells, 4),
+                        'Discovery_Date': self._extract_date(self._extract_text(cells, 5)),
+                        'Days_Overdue': self._calculate_overdue(self._extract_text(cells, 5)),
+                        'Owner': self._extract_text(cells, 6),
+                        'Status': self._extract_text(cells, 7),
+                        'Remediation_Plan': self._extract_text(cells, 8)
+                    }
+                    
+                    vulns.append(vuln)
+                    print(f"[+] Extracted: {vuln['Vuln_ID']} ({vuln['Severity']})")
+                
+                except Exception as e:
+                    print(f"[-] Error parsing row: {e}")
+                    continue
+            
+            return vulns
+        
+        except Exception as e:
+            print(f"[-] Error fetching vulnerabilities: {e}")
+            return []
+    
+    def _extract_text(self, cells, index):
+        """Safely extract text from cell"""
+        try:
+            return cells[index].get_text(strip=True)
+        except:
+            return ""
+    
+    def _extract_date(self, date_str):
+        """Parse and format date"""
+        try:
+            # Try multiple date formats
+            for fmt in ['%Y-%m-%d', '%m/%d/%Y', '%d-%m-%Y']:
+                try:
+                    parsed = datetime.strptime(date_str, fmt)
+                    return parsed.strftime('%Y-%m-%d')
+                except:
+                    continue
+            return datetime.now().strftime('%Y-%m-%d')
+        except:
+            return datetime.now().strftime('%Y-%m-%d')
+    
+    def _calculate_overdue(self, date_str):
+        """Calculate days overdue from date"""
+        try:
+            discovery_date = datetime.strptime(date_str, '%Y-%m-%d')
+            days_old = (datetime.now() - discovery_date).days
+            
+            # SLA: 30 days for critical
+            sla_days = 30
+            overdue = max(0, days_old - sla_days)
+            
+            return str(overdue)
+        except:
+            return "0"
+    
+    def save_to_csv(self, vulns, filename='devops_sec_vulnerabilities.csv'):
+        """Save vulnerabilities to CSV"""
+        if not vulns:
+            print("[-] No vulnerabilities to save")
+            return False
+        
+        fieldnames = ['Vuln_ID', 'CVE', 'Severity', 'Product', 'Component',
+                      'Discovery_Date', 'Days_Overdue', 'Owner', 'Status', 'Remediation_Plan']
+        
+        try:
+            with open(filename, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(vulns)
+            
+            print(f"[✓] Saved {len(vulns)} vulnerabilities to {filename}")
+            return True
+        
+        except Exception as e:
+            print(f"[-] Error saving to CSV: {e}")
+            return False
+
+def main():
+    print("=" * 60)
+    print("DevOps-Sec Portal Data Extractor")
+    print("=" * 60)
+    
+    extractor = DevopsSecExtractor()
+    
+    print("\n[*] Extracting data from devops-sec.vermeg.com...")
+    vulns = extractor.get_vulnerabilities()
+    
+    if vulns:
+        print(f"\n[✓] Successfully extracted {len(vulns)} vulnerabilities")
+        extractor.save_to_csv(vulns)
+        print("\n[✓] Data ready for dashboard import!")
+    else:
+        print("[-] No vulnerabilities extracted")
+
+if __name__ == '__main__':
+    main()
+```
+
+   To use this script:
+   ```bash
+   pip install beautifulsoup4 requests
+   python3 extract_devops_sec_data.py
+   ```
+
+STEP 2.4: Inspect Network Requests (Advanced)
+   
+   Use browser developer tools to find API calls:
+   
+   1. Open https://devops-sec.vermeg.com/vulnerabilities
+   2. Press F12 (Developer Tools)
+   3. Go to Network tab
+   4. Look for XHR/Fetch requests
+   5. Check for API endpoints returning JSON
+   6. Note the request URLs and parameters
+   
+   Example API call you might find:
+   GET /api/v1/vulnerabilities?limit=100&page=1
+   
+   Then you can query directly:
+   ```bash
+   curl "https://devops-sec.vermeg.com/api/v1/vulnerabilities" > vulns.json
+   ```
+
+================================================================================
+STEP 3: TRANSFORM DEVOPS-SEC DATA TO DASHBOARD FORMAT
+================================================================================
+
+STEP 3.1: Handle Different Data Sources
+   
+   DevOps-Sec typically aggregates from:
+   - Fortify SSC
+   - Sonatype Nexus IQ
+   - Container scanners
+   - SAST/DAST tools
+   
+   Ensure your mapping handles all sources
+
+STEP 3.2: Data Standardization
+   
+   Different sources may use different fields:
+   
+   Source              Severity Field      Product Field
+   ─────────────────────────────────────────────────────
+   Fortify             "severity"          "application"
+   Nexus IQ            "threatLevel"       "application"
+   Container Scan      "severity"          "image"
+   SAST Tool          "level"              "project"
+   
+   Create mapping:
+   ```python
+   severity_mapping = {
+       'CRITICAL': 'Critical',
+       'Critical': 'Critical',
+       'HIGH': 'High',
+       'High': 'High',
+       'MEDIUM': 'Medium',
+       'Medium': 'Medium',
+       'LOW': 'Low',
+       'Low': 'Low'
+   }
+   
+   product_mapping = {
+       'veggo-banking-platform': 'Veggo',
+       'megara-core-system': 'Megara',
+       # ... etc
+   }
+   ```
+
+STEP 3.3: Deduplication
+   
+   DevOps-Sec may show same vulnerability multiple times
+   if found by different scanners:
+   
+   ```python
+   # Keep only one instance of each CVE per product
+   seen = set()
+   unique_vulns = []
+   
+   for vuln in vulns:
+       key = (vuln['CVE'], vuln['Product'])
+       if key not in seen:
+           seen.add(key)
+           unique_vulns.append(vuln)
+   ```
+
+STEP 3.4: Validation
+   
+   Before importing:
+   ```python
+   def validate_vuln(vuln):
+       errors = []
+       
+       if not vuln.get('Vuln_ID'):
+           errors.append("Missing Vuln_ID")
+       if vuln.get('Severity') not in ['Critical', 'High', 'Medium', 'Low']:
+           errors.append(f"Invalid Severity: {vuln.get('Severity')}")
+       if not vuln.get('Product'):
+           errors.append("Missing Product")
+       
+       return errors
+   ```
+
+================================================================================
+STEP 4: CREATE AUTOMATED EXTRACTION PIPELINE
+================================================================================
+
+Daily Extraction Schedule:
+
+```bash
+#!/bin/bash
+# devops_sec_extract.sh - Daily vulnerability extraction
+
+TIMESTAMP=$(date +%Y-%m-%d)
+OUTPUT_FILE="/var/dashboards/devops_sec_${TIMESTAMP}.csv"
+
+echo "Extracting DevOps-Sec data..."
+
+# Method 1: Check for export API
+curl -s "https://devops-sec.vermeg.com/api/vulnerabilities?format=csv" \
+    > "${OUTPUT_FILE}"
+
+# Method 2: Run Python extractor if API not available
+if [ ! -s "${OUTPUT_FILE}" ]; then
+    python3 /home/ubuntu/extract_devops_sec_data.py
+    mv devops_sec_vulnerabilities.csv "${OUTPUT_FILE}"
+fi
+
+# Validate file
+if [ -s "${OUTPUT_FILE}" ]; then
+    echo "✓ Extraction successful: ${OUTPUT_FILE}"
+    # Optional: Upload to dashboard or send notification
+else
+    echo "✗ Extraction failed"
+fi
+```
+
+Add to crontab:
+```
+0 6 * * * /home/ubuntu/devops_sec_extract.sh
+```
+
+================================================================================
+STEP 5: COMBINE ALL DATA SOURCES
+================================================================================
+
+Final Integration with Fortify + Nexus IQ + DevOps-Sec:
+
+```python
+#!/usr/bin/env python3
+"""
+Merge data from all three sources into single dashboard CSV
+"""
+
+import pandas as pd
+from datetime import datetime
+
+# Load data from each source
+fortify_df = pd.read_csv('fortify_vulnerabilities.csv')
+nexus_df = pd.read_csv('nexus_iq_vulnerabilities.csv')
+devops_df = pd.read_csv('devops_sec_vulnerabilities.csv')
+
+print(f"Fortify: {len(fortify_df)} vulnerabilities")
+print(f"Nexus IQ: {len(nexus_df)} vulnerabilities")
+print(f"DevOps-Sec: {len(devops_df)} vulnerabilities")
+
+# Combine all
+combined_df = pd.concat([fortify_df, nexus_df, devops_df], ignore_index=True)
+
+# Remove duplicates (keep first occurrence)
+combined_df = combined_df.drop_duplicates(subset=['CVE', 'Product'], keep='first')
+
+# Ensure data quality
+combined_df = combined_df[combined_df['Severity'].isin(['Critical', 'High', 'Medium', 'Low'])]
+combined_df = combined_df.dropna(subset=['Vuln_ID', 'Product'])
+
+# Sort by severity (Critical first) and days overdue
+severity_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+combined_df['severity_order'] = combined_df['Severity'].map(severity_order)
+combined_df['Days_Overdue'] = pd.to_numeric(combined_df['Days_Overdue'], errors='coerce').fillna(0)
+combined_df = combined_df.sort_values(['severity_order', 'Days_Overdue'], ascending=[True, False])
+
+# Save final CSV
+output_file = f"dashboard_vulnerabilities_{datetime.now().strftime('%Y-%m-%d')}.csv"
+combined_df.to_csv(output_file, index=False)
+
+print(f"\n✓ Combined dataset: {len(combined_df)} unique vulnerabilities")
+print(f"✓ Saved to: {output_file}")
+```
+
+Run this weekly:
+```bash
+python3 combine_datasources.py
+```
+
+================================================================================
+COMMON ISSUES & SOLUTIONS
+================================================================================
+
+ISSUE 1: DevOps-Sec requires login
+SOLUTION:
+   - Add authentication to script:
+   ```python
+   session.post(
+       'https://devops-sec.vermeg.com/login',
+       data={'username': user, 'password': pwd}
+   )
+   ```
+
+ISSUE 2: Data format differences across sources
+SOLUTION:
+   - Map all sources to consistent format
+   - Use config file for mappings
+   - Validate before combining
+
+ISSUE 3: Duplicate vulnerabilities
+SOLUTION:
+   - Deduplicate on CVE + Product
+   - Keep most recent/authoritative source
+   - Add source attribution field
+
+ISSUE 4: Performance (large datasets)
+SOLUTION:
+   - Use pandas for efficiency
+   - Process in chunks
+   - Archive old data
+   - Implement incremental updates
+
+================================================================================
+FINAL WORKFLOW
+================================================================================
+
+Daily automated workflow:
+
+1. 6:00 AM - Extract Fortify data
+   → fortify_vulnerabilities.csv
+
+2. 6:15 AM - Extract Nexus IQ data
+   → nexus_iq_vulnerabilities.csv
+
+3. 6:30 AM - Extract DevOps-Sec data
+   → devops_sec_vulnerabilities.csv
+
+4. 6:45 AM - Combine and deduplicate
+   → dashboard_vulnerabilities_[DATE].csv
+
+5. 7:00 AM - Import into dashboard
+   → Live dashboard with latest data
+
+6. 7:15 AM - Generate reports
+   → Executive summary PDF
+
+7. 7:30 AM - Email to stakeholders
+   → Committee briefing ready
+
+Result: Fresh, deduplicated vulnerability data every morning!
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✓ Identify available APIs/exports on devops-sec
+2. ✓ Test data extraction
+3. ✓ Transform to dashboard format
+4. ✓ Combine with Fortify + Nexus IQ data
+5. ✓ Set up automated daily pipeline
+6. ✓ Validate data quality
+7. ✓ Import into dashboard
+8. ✓ Configure alerting
+
+Your dashboard is now powered by enterprise data!
+
+================================================================================
+Version 1.0 | May 2024
+================================================================================

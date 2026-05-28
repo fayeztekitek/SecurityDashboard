@@ -1,0 +1,405 @@
+================================================================================
+FORTIFY SSC - DATA INTEGRATION GUIDE
+Injecting Real Vulnerability Data into Security Dashboard
+================================================================================
+
+OVERVIEW
+========
+This guide shows how to extract vulnerability data from Fortify SSC and inject
+it into your Security Governance Dashboard.
+
+Two Methods:
+1. MANUAL EXPORT (30 minutes) - UI-based, no code required
+2. AUTOMATED API (15 minutes setup) - Python script, scheduled exports
+
+================================================================================
+METHOD 1: MANUAL EXPORT FROM FORTIFY SSC UI
+================================================================================
+
+STEP 1.1: Access Fortify SSC
+   URL: https://soft-security.vermeg.com/ssc/
+   Username: fayez
+   Password: devops@2025$
+   
+   (Use your browser to log in)
+
+STEP 1.2: Navigate to Reports
+   1. Log in to Fortify SSC
+   2. Go to: Dashboard → Reports menu
+   3. Select: "Vulnerability Report" or "Issue Report"
+
+STEP 1.3: Configure Report Filters
+   
+   Filter by:
+   ✓ Applications: Select all applications
+   ✓ Status: Open, In Progress (not Closed unless reviewing)
+   ✓ Severity: All (Critical, High, Medium, Low)
+   ✓ Date Range: Last 90 days (or custom)
+   ✓ Only if suppressed: No (we want all issues)
+   
+   Example filters:
+   - Critical & High only: Check "Show only Critical/High"
+   - Specific application: Filter by "Veggo", "Megara", etc.
+   - Overdue only: Filter by Discovery Date > 30 days ago
+
+STEP 1.4: Export as CSV
+   
+   1. Configure columns to include:
+      ✓ Issue ID / Instance ID
+      ✓ Category / Vulnerability Name
+      ✓ CWE ID (for CVE mapping)
+      ✓ Severity
+      ✓ Confidence
+      ✓ Application Name
+      ✓ Found Date / Discovery Date
+      ✓ Assigned User / Owner
+      ✓ Issue Status
+      ✓ Primary Location / Component
+      ✓ Comments / Remediation Notes
+      ✓ Analysis Status
+   
+   2. Click "Export"
+   3. Select format: CSV
+   4. Choose location: Save to Downloads
+   5. Filename: fortify_export_[DATE].csv
+
+STEP 1.5: Map Fortify Fields to Dashboard Format
+   
+   Fortify Field                    →    Dashboard CSV Column
+   ─────────────────────────────────────────────────────────
+   Issue ID / Instance ID           →    Vuln_ID
+   CWE ID or Vulnerability Name     →    CVE (extract CVE-XXXX-XXXX if available)
+   Severity                         →    Severity (Critical/High/Medium/Low)
+   Application Name                 →    Product
+   Primary Location / Component     →    Component
+   Found Date / Discovery Date      →    Discovery_Date (format: YYYY-MM-DD)
+   Assigned User / Owner            →    Owner
+   Issue Status                     →    Status (Open/In Progress/Closed)
+   Comments / Analysis Notes        →    Remediation_Plan
+   
+   Example mapping:
+   Fortify CSV Row:
+   "1001","Application Vulnerability","CWE-1234","Critical","Veggo","OpenSSL",...
+   
+   Dashboard CSV Row:
+   "VUL-2024-001","CVE-2024-1234","Critical","Veggo","OpenSSL",...
+
+STEP 1.6: Transform CSV in Excel/Google Sheets
+   
+   1. Open exported Fortify CSV in Excel
+   2. Create new columns for dashboard format:
+      A: Vuln_ID (copy from Issue ID, prefix with "VUL-")
+      B: CVE (extract CVE number or leave blank)
+      C: Severity (copy from Severity column)
+      D: Product (copy from Application Name)
+      E: Component (copy from Primary Location)
+      F: Discovery_Date (format as YYYY-MM-DD)
+      G: Days_Overdue (calculate: =IF(Severity="Critical", IF((TODAY()-F2)>30, TODAY()-F2, 0), ...))
+      H: Owner (copy from Assigned User)
+      I: Status (copy from Issue Status, map: Unreviewed→Open, Reviewed→Open, etc.)
+      J: Remediation_Plan (copy from Comments)
+   
+   3. Save as CSV (UTF-8)
+   4. Name: fortify_vulnerabilities.csv
+
+STEP 1.7: Load into Dashboard
+   
+   1. Open dashboard_live_demo.html in browser
+   2. Scroll to bottom (or look for "Import Data" section if available)
+   3. Click "Import CSV File"
+   4. Select: fortify_vulnerabilities.csv
+   5. Dashboard updates automatically with real data!
+
+================================================================================
+METHOD 2: AUTOMATED API EXTRACTION (Using Python)
+================================================================================
+
+PREREQUISITES
+=============
+1. Python 3.8+ installed
+2. Required packages: pip install requests python-dateutil
+3. Fortify API Token (generate from SSC)
+
+STEP 2.1: Generate Fortify API Token
+   
+   1. Log into Fortify SSC: https://soft-security.vermeg.com/ssc/
+   2. Click your username (top right) → Administration → API Tokens
+   3. Click "New API Token"
+   4. Name: "SecurityDashboard"
+   5. Select scope: "API Token"
+   6. Click "Generate"
+   7. Copy token (you won't see it again!)
+   8. Save securely
+
+STEP 2.2: Install Python Script
+   
+   Already provided in your GitHub repository:
+   File: extract_fortify_data.py
+   
+   Make executable:
+   chmod +x extract_fortify_data.py
+
+STEP 2.3: Run Script with Your Credentials
+   
+   Command:
+   python3 extract_fortify_data.py \
+       --fortify-url https://soft-security.vermeg.com/ssc \
+       --token YOUR_API_TOKEN \
+       --output fortify_real_data.csv \
+       --days 90
+   
+   Example:
+   python3 extract_fortify_data.py \
+       --fortify-url https://soft-security.vermeg.com/ssc \
+       --token ghp_XXXXXXXXXXXX \
+       --output vulnerabilities.csv \
+       --days 90
+   
+   Parameters:
+   --fortify-url: Your Fortify SSC URL
+   --token: API token from Step 2.1
+   --output: Output CSV filename
+   --days: Only export issues from last N days (default: 90)
+
+STEP 2.4: Script Output
+   
+   Script will:
+   ✓ Connect to Fortify SSC
+   ✓ Fetch all projects/applications
+   ✓ Extract vulnerabilities from each project
+   ✓ Map to dashboard CSV format
+   ✓ Save to CSV file
+   ✓ Show summary: "✓ Successfully wrote 457 vulnerabilities"
+
+STEP 2.5: Load into Dashboard
+   
+   1. Open dashboard_live_demo.html
+   2. Import the generated CSV file
+   3. Dashboard updates with real Fortify data!
+
+STEP 2.6: Automate Extraction (Scheduled)
+   
+   Create scheduled job (cron, Task Scheduler, Jenkins):
+   
+   # Cron example (runs daily at 6 AM):
+   0 6 * * * /usr/bin/python3 /path/to/extract_fortify_data.py \
+       --fortify-url https://soft-security.vermeg.com/ssc \
+       --token $FORTIFY_TOKEN \
+       --output /var/dashboards/fortify_$(date +\%Y-\%m-\%d).csv
+   
+   # Jenkins Pipeline example:
+   pipeline {
+       triggers {
+           cron('0 6 * * *')  // Daily at 6 AM
+       }
+       stages {
+           stage('Extract Fortify Data') {
+               steps {
+                   sh 'python3 extract_fortify_data.py \
+                       --fortify-url https://soft-security.vermeg.com/ssc \
+                       --token ${FORTIFY_TOKEN} \
+                       --output vulnerabilities.csv'
+               }
+           }
+           stage('Upload to Dashboard') {
+               steps {
+                   // Upload CSV to shared location
+                   sh 'cp vulnerabilities.csv /var/www/dashboard/'
+               }
+           }
+       }
+   }
+
+================================================================================
+FORTIFY DATA MAPPING DETAILS
+================================================================================
+
+Understanding Field Mappings:
+
+1. VULNERABILITY ID MAPPING
+   Fortify: Issue ID = 1001, Instance ID = 1001-001
+   Dashboard: Vuln_ID = VUL-2024-0001 (prefix with "VUL-")
+   
+   Formula in Excel: =CONCATENATE("VUL-",ROW()-1)
+
+2. CVE EXTRACTION
+   Fortify: Issue Name contains "CVE-2024-1234" or separate CVE field
+   Dashboard: CVE = "CVE-2024-1234"
+   
+   If no CVE available, leave blank or use CWE ID
+
+3. SEVERITY NORMALIZATION
+   Fortify values    →    Dashboard values
+   Critical          →    Critical ✓
+   High              →    High ✓
+   Medium            →    Medium ✓
+   Low               →    Low ✓
+   (Most Fortify uses these exact names)
+
+4. PRODUCT NAME CONSISTENCY
+   CRITICAL: Product names must match exactly across all data!
+   
+   Fortify: "Veggo Banking Platform" 
+   Dashboard: Must standardize to "Veggo"
+   
+   Create mapping list:
+   Veggo Banking Platform → Veggo
+   Megara Core System → Megara
+   Colline Insurance → Colline
+   Digital Collateral Module → Digital Collateral
+   Digital Insurance Engine → Digital Insurance
+   
+   Use VLOOKUP in Excel to standardize
+
+5. DATE FORMAT
+   Fortify: "2024-02-15" or "02/15/2024"
+   Dashboard: MUST be "YYYY-MM-DD"
+   
+   Excel formula: =TEXT(FoundDate,"YYYY-MM-DD")
+
+6. DAYS OVERDUE CALCULATION
+   Formula: =IF(Status="Open", IF((TODAY()-DiscoveryDate)>SLADays, (TODAY()-DiscoveryDate)-SLADays, 0), 0)
+   
+   SLA Days by Severity:
+   Critical: 30 days
+   High: 60 days
+   Medium: 90 days
+   Low: 180 days
+   
+   Example:
+   Critical discovered 2024-01-15, today is 2024-02-20
+   Days old = 36 days
+   Days overdue = 36 - 30 = 6 days
+
+7. OWNER MAPPING
+   Fortify: "john.doe@vermeg.com"
+   Dashboard: "John Doe" (friendly name, not email)
+   
+   Use formula: =LEFT(OwnerEmail, FIND(".", OwnerEmail)-1) & " " & PROPER(MID(...))
+
+================================================================================
+FORTIFY DATA QUALITY CHECKS
+================================================================================
+
+Before importing, verify:
+
+✓ All required columns present
+✓ No empty Vuln_ID cells
+✓ Severity values: Only Critical/High/Medium/Low
+✓ Dates in YYYY-MM-DD format
+✓ Days_Overdue is numeric (0, 1, 2, etc.)
+✓ Product names match your standardized list
+✓ Status values: Open/In Progress/Closed
+✓ No duplicate Vuln_IDs
+✓ CSV saved as UTF-8 (not Latin-1)
+✓ Owner names are consistent (format: "First Last")
+
+Validation formula in Excel:
+=IF(OR(ISBLANK(A2), NOT(ISNUMBER(G2)), NOT(ISNUMBER(E2))), "INVALID", "OK")
+
+================================================================================
+TROUBLESHOOTING FORTIFY INTEGRATION
+================================================================================
+
+PROBLEM: "API Token Invalid"
+SOLUTION:
+   - Verify token copied correctly (no spaces)
+   - Token may have expired (regenerate from SSC)
+   - Check URL is correct (https://soft-security.vermeg.com/ssc)
+   - Ensure you have API access permissions
+
+PROBLEM: "No projects found"
+SOLUTION:
+   - Verify you're logged in with correct user
+   - User may not have permission to see projects
+   - Check Fortify settings: Administration → Users → verify permissions
+
+PROBLEM: "CSV import fails - columns not recognized"
+SOLUTION:
+   - Verify column names are EXACTLY:
+     Vuln_ID, CVE, Severity, Product, Component, Discovery_Date, Days_Overdue, Owner, Status, Remediation_Plan
+   - Column names are case-sensitive
+   - No extra spaces in headers
+
+PROBLEM: "Data looks wrong in dashboard"
+SOLUTION:
+   - Check Severity values (must be: Critical, High, Medium, Low)
+   - Verify Product names are consistent (no typos)
+   - Check dates are YYYY-MM-DD format
+   - Ensure Days_Overdue is numeric (not text)
+
+PROBLEM: "Fortify shows issues but CSV is empty"
+SOLUTION:
+   - Filter in Fortify may be too restrictive
+   - Check "Only if suppressed" - set to "No"
+   - Verify Status includes "Unreviewed" and "Reviewed"
+   - Try exporting with fewer filters first
+
+================================================================================
+FORTIFY EXPORT SCHEDULE
+================================================================================
+
+RECOMMENDED FREQUENCY:
+- Weekly: Default schedule for regular updates
+- Daily: If rapid changes expected
+- Monthly: For comprehensive reviews
+
+SUGGESTED SCHEDULE:
+- Every Monday at 6 AM: Weekly scan report
+- Every Friday at 5 PM: End-of-week summary
+- Monthly last day: Comprehensive month report
+
+AUTOMATION EXAMPLE (Cron):
+# Weekly on Monday at 6 AM
+0 6 * * 1 python3 /home/ubuntu/extract_fortify_data.py \
+  --fortify-url https://soft-security.vermeg.com/ssc \
+  --token $FORTIFY_TOKEN \
+  --output /var/dashboards/fortify_weekly.csv
+
+# Daily at 6 AM
+0 6 * * * python3 /home/ubuntu/extract_fortify_data.py \
+  --fortify-url https://soft-security.vermeg.com/ssc \
+  --token $FORTIFY_TOKEN \
+  --output /var/dashboards/fortify_$(date +\%Y-\%m-\%d).csv
+
+================================================================================
+FORTIFY API REFERENCE
+================================================================================
+
+Useful Fortify SSC REST API Endpoints:
+
+1. Get all projects:
+   GET /api/v1/projects
+   
+2. Get project issues:
+   GET /api/v1/projects/{projectId}/issues
+   
+3. Filter by criteria:
+   GET /api/v1/projects/{projectId}/issues?filter=severity:Critical
+   
+4. Get issue details:
+   GET /api/v1/projects/{projectId}/issues/{issueId}
+
+5. Get artifacts (components):
+   GET /api/v1/projects/{projectId}/issues/{issueId}/artifacts
+
+Documentation: https://soft-security.vermeg.com/ssc/api/
+(Requires Fortify login)
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✓ Choose integration method (Manual or API)
+2. ✓ Extract data from Fortify
+3. ✓ Create CSV in dashboard format
+4. ✓ Validate data quality
+5. ✓ Import into dashboard
+6. ✓ Set up automated schedule (optional)
+7. ✓ Share dashboard with security team
+
+Your dashboard is now powered by real Fortify data!
+
+================================================================================
+Version 1.0 | May 2024
+================================================================================
