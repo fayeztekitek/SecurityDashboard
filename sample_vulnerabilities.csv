@@ -1,0 +1,11 @@
+Vuln_ID,CVE,Severity,Product,Component,Discovery_Date,Days_Overdue,Owner,Status,Remediation_Plan
+VUL-2024-001,CVE-2024-1234,Critical,Veggo,OpenSSL 1.1.1,2024-01-15,45,John Doe,Open,Upgrade to OpenSSL 3.0
+VUL-2024-002,CVE-2024-5678,High,Megara,Log4j 2.14.1,2024-02-01,20,Jane Smith,Open,Patch to v2.17
+VUL-2024-003,CVE-2024-9012,Medium,Colline,jQuery 3.5,2024-02-10,5,Bob Johnson,Open,Update to v3.6
+VUL-2024-004,CVE-2024-3456,Critical,Digital Collateral,Spring Framework 5.2,2024-01-20,35,Alice Brown,Open,Upgrade to v6.0
+VUL-2024-005,CVE-2024-7890,High,Digital Insurance,Apache Struts 2.5,2024-02-05,18,Charlie Davis,Open,Migrate to Spring Boot
+VUL-2024-006,CVE-2024-4567,Low,Veggo,Bootstrap 4.6,2024-02-20,0,John Doe,Closed,Updated to v5.2
+VUL-2024-007,CVE-2024-8901,Medium,Megara,MySQL Connector,2024-01-25,15,Jane Smith,Open,Upgrade to 8.0.33
+VUL-2024-008,CVE-2024-2345,High,Colline,Angular 12.0,2024-02-08,22,Bob Johnson,Open,Migrate to v16
+VUL-2024-009,CVE-2024-6789,Critical,Digital Collateral,Java Serialization,2024-01-10,40,Alice Brown,Open,Implement validation
+VUL-2024-010,CVE-2024-0123,High,Digital Insurance,Tomcat 9.0,2024-02-12,12,Charlie Davis,Open,Update to v10.1.5

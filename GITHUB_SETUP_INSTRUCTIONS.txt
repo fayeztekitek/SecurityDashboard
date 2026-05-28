@@ -1,0 +1,624 @@
+================================================================================
+GITHUB REPOSITORY SETUP GUIDE
+Security Governance Dashboard
+================================================================================
+
+This guide provides complete step-by-step instructions for setting up your
+Security Governance Dashboard GitHub repository.
+
+================================================================================
+PART 1: GITHUB ACCOUNT & AUTHENTICATION
+================================================================================
+
+STEP 1.1: GitHub Account
+   1. Go to https://github.com/
+   2. Sign in (or create account if needed)
+   3. Verify your email address
+   4. Optional: Enable 2FA for security
+      Settings → Security → Two-factor authentication
+
+STEP 1.2: Generate Personal Access Token
+   (Required for HTTPS cloning)
+   
+   1. Go to https://github.com/settings/tokens/new
+   2. Select scopes:
+      ✓ repo (Full control of repositories)
+      ✓ workflow (Update GitHub Actions workflows)
+      ✓ admin:repo_hook (Full control of repository hooks)
+   3. Click "Generate token"
+   4. Copy token (you won't see it again!)
+   5. Save securely (Password manager recommended)
+
+   Alternative - SSH Setup:
+   1. Generate SSH key: ssh-keygen -t ed25519 -C "your@email.com"
+   2. Add to agent: ssh-add ~/.ssh/id_ed25519
+   3. Copy public key: cat ~/.ssh/id_ed25519.pub
+   4. GitHub Settings → SSH Keys → New SSH Key
+   5. Paste public key and save
+
+STEP 1.3: Configure Git Locally
+   
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "your@email.com"
+   git config --global core.editor "vim"  # or your preferred editor
+   ```
+
+================================================================================
+PART 2: CREATE GITHUB REPOSITORY
+================================================================================
+
+STEP 2.1: Create New Repository on GitHub
+   
+   1. Log into GitHub: https://github.com
+   2. Click "+" icon (top right) → New repository
+   3. Fill in details:
+      Name: security-governance-dashboard
+      Description: Security Governance Dashboard - Vulnerability Management
+      Visibility: PRIVATE (for internal use)
+      
+   4. Initialize options:
+      ✗ DO NOT initialize with README
+      ✗ DO NOT add .gitignore
+      ✗ DO NOT add license
+      (We have these already prepared)
+   
+   5. Click "Create repository"
+
+STEP 2.2: Repository Settings Configuration
+   
+   Go to Settings tab:
+   
+   General:
+   - Description: "Interactive vulnerability governance dashboard"
+   - Private: Yes
+   - Template: No
+   - Issues: Enable ✓
+   - Wikis: Enable ✓
+   - Projects: Enable ✓
+   - Discussions: Enable ✓
+   
+   Branches:
+   - Default branch: main
+   - Protection rules: Configure (see below)
+   
+   Collaborators:
+   - Add your team members
+   - Set appropriate permissions
+
+STEP 2.3: Branch Protection Rules
+   
+   1. Settings → Branches
+   2. Add rule for main branch:
+      Pattern: main
+      ✓ Require a pull request before merging
+      ✓ Require status checks to pass
+      ✓ Require branches to be up to date
+      ✓ Dismiss stale PR approvals
+      ✓ Restrict who can push to matching branches
+   
+   3. Save
+
+================================================================================
+PART 3: CLONE & SETUP LOCAL REPOSITORY
+================================================================================
+
+STEP 3.1: Clone Repository (HTTPS Method)
+   
+   ```bash
+   cd ~/projects  # or your preferred location
+   git clone https://github.com/YOUR_USERNAME/security-governance-dashboard.git
+   cd security-governance-dashboard
+   ```
+   
+   When prompted for password, use the Personal Access Token you generated.
+
+   Or (SSH Method):
+   ```bash
+   git clone git@github.com:YOUR_USERNAME/security-governance-dashboard.git
+   cd security-governance-dashboard
+   ```
+
+STEP 3.2: Verify Cloned Content
+   
+   ```bash
+   # Check status
+   git status
+   
+   # List files
+   ls -la
+   
+   # Expected files:
+   # - consolidated_dashboard.html
+   # - sample_vulnerabilities.csv
+   # - README.md
+   # - DATA_EXTRACTION_GUIDE.txt
+   # - extract_fortify_data.py
+   # - .gitignore
+   # - .github/ (directory with templates)
+   # - LICENSE
+   ```
+
+STEP 3.3: Verify Remote Configuration
+   
+   ```bash
+   # Check remote URL
+   git remote -v
+   
+   # Expected output:
+   # origin  https://github.com/YOUR_USERNAME/security-governance-dashboard.git (fetch)
+   # origin  https://github.com/YOUR_USERNAME/security-governance-dashboard.git (push)
+   ```
+
+================================================================================
+PART 4: PUSH DASHBOARD FILES
+================================================================================
+
+STEP 4.1: Prepare Files
+   
+   All dashboard files should already be in the directory if you cloned properly.
+   If adding manually:
+   
+   ```bash
+   # Copy files to repository directory
+   cp /home/claude/consolidated_dashboard.html .
+   cp /home/claude/sample_vulnerabilities.csv .
+   cp /home/claude/*.txt .
+   cp /home/claude/*.py .
+   cp /home/claude/.gitignore .
+   cp /home/claude/LICENSE .
+   ```
+
+STEP 4.2: Verify Files
+   
+   ```bash
+   # Check all required files are present
+   git status
+   
+   # All files should show as "new file"
+   # If .gitignore is working, you shouldn't see:
+   # - __pycache__
+   # - .venv or venv
+   # - *.pyc
+   # - Sample CSV exports (only sample_vulnerabilities.csv)
+   ```
+
+STEP 4.3: Initial Commit & Push
+   
+   ```bash
+   # Stage all files
+   git add .
+   
+   # Create initial commit
+   git commit -m "Initial commit: Security Governance Dashboard v1.0
+
+   - Interactive vulnerability governance dashboard
+   - CSV data import capability
+   - Real-time KPI calculations
+   - RAG status indicators
+   - Executive summary generation
+   - Support for Fortify SSC integration
+   - Responsive design for desktop and mobile
+   - Zero external dependencies (Chart.js via CDN)"
+   
+   # Push to GitHub
+   git push -u origin main
+   ```
+
+STEP 4.4: Verify on GitHub
+   
+   1. Go to https://github.com/YOUR_USERNAME/security-governance-dashboard
+   2. Verify all files appear
+   3. Check commit message is correct
+   4. Verify file counts match local
+
+================================================================================
+PART 5: CONFIGURE GITHUB FEATURES
+================================================================================
+
+STEP 5.1: Enable GitHub Pages (Optional)
+   
+   For hosting dashboard online:
+   
+   1. Settings → Pages
+   2. Source: Deploy from a branch
+   3. Branch: main, folder: / (root)
+   4. Click Save
+   5. Wait 1-2 minutes for deployment
+   6. Visit https://YOUR_USERNAME.github.io/security-governance-dashboard/
+   
+   To use this instead of local:
+   - Download consolidated_dashboard.html from GitHub Pages
+   - Or open directly from GitHub Pages URL
+
+STEP 5.2: Configure Issues (Already enabled)
+   
+   1. Go to Issues tab
+   2. Create issue labels:
+      - bug (red)
+      - enhancement (green)
+      - documentation (blue)
+      - data-import (purple)
+      - help-wanted (orange)
+   
+   2. Create issue milestones:
+      - v1.1 (planned features)
+      - v1.2 (future features)
+      - v2.0 (major release)
+
+STEP 5.3: Configure Wiki (Optional)
+   
+   1. Click Wiki tab
+   2. Create pages:
+      - Home
+      - Quick Start
+      - Data Format Guide
+      - Fortify Integration
+      - Troubleshooting
+   
+   Copy content from TXT files to Wiki pages
+
+STEP 5.4: Configure Projects (Optional)
+   
+   1. Click Projects tab
+   2. Create project: "Feature Development"
+   3. Create columns:
+      - Backlog
+      - In Progress
+      - In Review
+      - Done
+   
+   This helps track dashboard improvements
+
+================================================================================
+PART 6: TEAM SETUP & COLLABORATION
+================================================================================
+
+STEP 6.1: Add Team Members
+   
+   1. Settings → Collaborators and teams
+   2. Add collaborators:
+      - Security team members (Admin/Write)
+      - Developers (Write)
+      - Stakeholders (Read)
+   
+   3. Verify they accept invitation
+
+STEP 6.2: Create Team (If using GitHub organization)
+   
+   1. GitHub organization → Teams
+   2. Create team: "Security Governance"
+   3. Add members
+   4. Assign repository with proper permissions
+
+STEP 6.3: Configure Notifications
+   
+   For you:
+   1. Settings → Notifications
+   2. Default branch: Participate and @mentions
+   3. Save
+   
+   For team:
+   - All members should "Watch" repository
+   - Ensure email notifications are working
+   - Test with a comment on an issue
+
+================================================================================
+PART 7: LOCAL DEVELOPMENT WORKFLOW
+================================================================================
+
+STEP 7.1: Create Feature Branch
+   
+   Always create feature branches, never commit to main:
+   
+   ```bash
+   # Update main branch first
+   git checkout main
+   git pull origin main
+   
+   # Create feature branch
+   git checkout -b feature/new-dashboard-section
+   
+   # Verify branch
+   git branch
+   # Should show: * feature/new-dashboard-section
+   ```
+
+STEP 7.2: Make Changes
+   
+   ```bash
+   # Edit consolidated_dashboard.html or other files
+   nano consolidated_dashboard.html
+   
+   # Test in browser locally
+   # Open file:///home/claude/consolidated_dashboard.html
+   
+   # Check what changed
+   git status
+   git diff consolidated_dashboard.html  # View changes
+   ```
+
+STEP 7.3: Commit Changes
+   
+   ```bash
+   # Stage changes
+   git add consolidated_dashboard.html
+   
+   # Create meaningful commit
+   git commit -m "feat: Add new vulnerability section with drill-down
+
+   - Display vulnerability details on click
+   - Show remediation history timeline
+   - Link to related vulnerabilities
+   - Add CVSS score display"
+   
+   # View commits
+   git log -5
+   ```
+
+STEP 7.4: Push & Create Pull Request
+   
+   ```bash
+   # Push feature branch
+   git push origin feature/new-dashboard-section
+   ```
+   
+   On GitHub:
+   1. Go to repository
+   2. Click "Compare & pull request" button
+   3. Fill PR description (see CONTRIBUTING.md)
+   4. Request review from team
+   5. Click "Create pull request"
+   
+   Example PR title: "[FEATURE] Add vulnerability drill-down view"
+
+STEP 7.5: Review & Merge
+   
+   1. Wait for team review
+   2. Address any comments
+   3. Make updates if needed (commit to same branch)
+   4. Maintainer approves and merges
+   5. Delete feature branch:
+      ```bash
+      git branch -d feature/new-dashboard-section
+      git push origin --delete feature/new-dashboard-section
+      ```
+
+STEP 7.6: Sync Local Repository
+   
+   ```bash
+   # Update main from GitHub
+   git checkout main
+   git pull origin main
+   
+   # Start new feature
+   git checkout -b feature/next-improvement
+   ```
+
+================================================================================
+PART 8: CONTINUOUS IMPROVEMENT
+================================================================================
+
+STEP 8.1: Regular Updates
+   
+   Set a schedule for maintaining the dashboard:
+   - Weekly: Check for issues and PRs
+   - Monthly: Review feature requests
+   - Quarterly: Plan major improvements
+   - Annually: Major version release planning
+
+STEP 8.2: Documentation Updates
+   
+   Keep documentation in sync with code:
+   - Update README.md when features change
+   - Add examples to DATA_EXTRACTION_GUIDE.txt
+   - Update version in files
+   - Document breaking changes
+
+STEP 8.3: Release Process
+   
+   When ready for version release:
+   
+   ```bash
+   # Create release branch
+   git checkout -b release/v1.1
+   
+   # Update version numbers in files
+   # Add release notes
+   
+   git commit -m "chore: Prepare v1.1 release"
+   git push origin release/v1.1
+   
+   # Create Pull Request for release
+   # After merge, create GitHub Release:
+   # - Tag: v1.1
+   # - Title: Security Governance Dashboard v1.1
+   # - Release notes: Features, bug fixes, improvements
+   ```
+
+================================================================================
+PART 9: TROUBLESHOOTING
+================================================================================
+
+PROBLEM: "fatal: Authentication failed"
+SOLUTION:
+   - Verify Personal Access Token is correct
+   - Token may have expired (generate new one)
+   - Check SSH key is configured (if using SSH)
+   - Try: git credential-osxkeychain erase (Mac)
+
+PROBLEM: "error: Repository not found"
+SOLUTION:
+   - Verify repository URL is correct
+   - Check you have access permissions
+   - Verify repository is not private without access
+   - Verify user/org name in URL is correct
+
+PROBLEM: "fatal: refusing to merge unrelated histories"
+SOLUTION:
+   - You cloned empty repo, added files locally
+   - Use: git pull origin main --allow-unrelated-histories
+   - Or: clone fresh and copy files
+
+PROBLEM: "conflict in consolidated_dashboard.html"
+SOLUTION:
+   - Pull latest: git pull origin main
+   - Edit file to resolve conflicts
+   - Look for <<<<<<< markers
+   - Keep desired changes, delete markers
+   - git add file && git commit
+
+PROBLEM: "Changes not appearing on GitHub after push"
+SOLUTION:
+   - Verify correct branch: git branch -a
+   - Check push was successful: git push -v
+   - Refresh GitHub page (Ctrl+Shift+R)
+   - Wait 30 seconds for cache update
+
+PROBLEM: "Accidentally committed to main"
+SOLUTION:
+   # If not pushed yet:
+   git reset HEAD~1
+   git checkout consolidated_dashboard.html
+   git stash
+   git checkout -b feature/fix-this
+   
+   # Then make changes and create PR
+
+PROBLEM: "Want to undo recent commits"
+SOLUTION:
+   # View history
+   git log --oneline -10
+   
+   # Revert single commit (keeps history)
+   git revert COMMIT_HASH
+   
+   # Or reset to specific commit (erases history)
+   git reset --hard COMMIT_HASH
+   git push origin main --force  # Only if not pushed!
+
+================================================================================
+PART 10: BEST PRACTICES
+================================================================================
+
+✓ DO:
+  - Always pull before making changes
+  - Create feature branches for all work
+  - Use meaningful commit messages
+  - Test locally before pushing
+  - Keep commits focused on one change
+  - Update documentation with code
+  - Use pull requests for all changes
+  - Review others' pull requests
+  - Keep main branch deployable
+
+✗ DON'T:
+  - Commit directly to main
+  - Use vague commit messages ("fix stuff")
+  - Push broken code
+  - Force push to main
+  - Commit sensitive data (keys, passwords, tokens)
+  - Ignore merge conflicts
+  - Leave long-running branches
+  - Mix multiple features in one PR
+  - Skip testing before push
+  - Commit with --no-verify flag
+
+================================================================================
+USEFUL GIT COMMANDS
+================================================================================
+
+Status & Information:
+   git status                    # See current state
+   git log --oneline -10         # View last 10 commits
+   git branch -a                 # List all branches
+   git remote -v                 # View remote URLs
+
+Branching:
+   git checkout -b new-branch    # Create & switch branch
+   git checkout main             # Switch to main
+   git branch -d branch-name     # Delete local branch
+   git push origin --delete name # Delete remote branch
+
+Commits:
+   git add .                     # Stage all changes
+   git add file.txt              # Stage specific file
+   git commit -m "message"       # Create commit
+   git reset HEAD~1              # Undo last commit (keep changes)
+   git revert HASH               # Undo commit (keep history)
+
+Push & Pull:
+   git push origin branch        # Push to GitHub
+   git pull origin main          # Pull from GitHub
+   git fetch origin              # Get remote changes (no merge)
+   git pull --rebase origin main # Pull with rebase
+
+Stash (temporary storage):
+   git stash                     # Save changes temporarily
+   git stash pop                 # Restore saved changes
+   git stash list                # View stashed changes
+
+Merge & Rebase:
+   git merge feature-branch      # Merge branch into current
+   git rebase main               # Rebase current onto main
+   git merge --abort             # Cancel merge if conflicts
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✓ Complete authentication setup (Step 1)
+2. ✓ Create GitHub repository (Step 2)
+3. ✓ Clone repository locally (Step 3)
+4. ✓ Push dashboard files (Step 4)
+5. ✓ Configure GitHub features (Step 5)
+6. ✓ Add team members (Step 6)
+7. Start regular development workflow (Step 7)
+8. Monitor and improve dashboard (Step 8)
+9. Release versions as needed (Step 8.3)
+10. Maintain quality with best practices (Step 10)
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+Create new feature:
+   git checkout -b feature/name
+   # make changes, test
+   git add .
+   git commit -m "feat: description"
+   git push origin feature/name
+   # Create PR on GitHub
+
+Update from GitHub:
+   git checkout main
+   git pull origin main
+
+Clean up branches:
+   git branch -d finished-feature
+   git push origin --delete finished-feature
+
+See what changed:
+   git diff                      # Unstaged changes
+   git diff --staged             # Staged changes
+   git log -p -3                 # Last 3 commits with changes
+
+================================================================================
+SUPPORT
+================================================================================
+
+For GitHub issues:
+- Check GitHub help: https://docs.github.com
+- Contact GitHub support: https://support.github.com
+- Search Stack Overflow for Git issues
+
+For dashboard development:
+- Check CONTRIBUTING.md in repository
+- Open issue with proper template
+- Review existing issues/PRs
+
+================================================================================
+Version: 1.0
+Last Updated: February 2024
+Status: Complete
+================================================================================

@@ -1,0 +1,253 @@
+================================================================================
+SECURITY GOVERNANCE DASHBOARD - DATA EXTRACTION GUIDE
+================================================================================
+
+OVERVIEW
+========
+This guide explains how to extract vulnerability data from your security systems
+(Fortify SSC, Sonatype Nexus IQ, etc.) and format it for the Security Governance
+Dashboard.
+
+================================================================================
+STEP 1: EXPORT FROM FORTIFY SSC
+================================================================================
+
+1.1 - Navigate to Reports
+    - Log into Fortify SSC: https://soft-security.vermeg.com/ssc/
+    - Go to Reports section
+    - Select "Vulnerability Report"
+
+1.2 - Filter by Data Needed
+    - Select all Applications/Products
+    - Filter Status: "Open" or "In Progress"
+    - Severity: All levels
+    - Date Range: Last 90 days
+
+1.3 - Export as CSV
+    - Click "Export" → Select "CSV Format"
+    - Save file: vulnerabilities_fortify.csv
+    - File location: /home/claude/
+
+1.4 - Expected Fortify CSV Format
+    Column Names:
+    - Application
+    - Vulnerability
+    - CweId
+    - Severity
+    - Status
+    - FoundDate
+    - Component
+    - IssueInstanceId
+
+================================================================================
+STEP 2: EXPORT RISK ACCEPTANCES (WAIVERS)
+================================================================================
+
+2.1 - From Fortify SSC
+    - Navigate to Risk Management → Risk Acceptances
+    - Select all active and expiring acceptances
+    - Export as CSV
+
+2.2 - Expected Format
+    Column Names:
+    - RiskAcceptanceId
+    - VulnerabilityId
+    - Severity
+    - Application (Product)
+    - Owner
+    - JustificationText
+    - ApprovalDate
+    - ExpiryDate
+    - Status
+
+================================================================================
+STEP 3: EXPORT APPLICATION PORTFOLIO
+================================================================================
+
+3.1 - Application Inventory
+    - From Fortify SSC → Applications
+    - Export list with metadata
+    - Include: Application Name, Organization, Market, Environment (Prod/Dev/Test)
+
+3.2 - Expected Format
+    Column Names:
+    - ApplicationName
+    - Organization
+    - Market
+    - Environment
+    - Owner
+    - TechStack
+    - ScanDate
+
+================================================================================
+STEP 4: EXPORT CLIENT DEPLOYMENT INFO
+================================================================================
+
+4.1 - From CRM or Deployment System
+    - Extract: Which clients use which products
+    - Deployment dates and versions
+    - Customer environment information
+
+4.2 - Expected Format
+    Column Names:
+    - ClientName
+    - ProductName
+    - DeploymentDate
+    - CurrentVersion
+    - Environment
+
+================================================================================
+REQUIRED CSV COLUMNS FOR DASHBOARD
+================================================================================
+
+CRITICAL (Must Have):
+    - Vuln_ID          (Unique identifier, e.g., VUL-2024-001)
+    - CVE              (CVE number if available, e.g., CVE-2024-1234)
+    - Severity         (Must be: Critical, High, Medium, or Low)
+    - Product          (Product/Application name, e.g., Veggo, Megara)
+    - Status           (Must be: Open, In Progress, or Closed)
+    - Discovery_Date   (Format: YYYY-MM-DD)
+    - Days_Overdue     (Integer: 0 if on time, >0 if overdue)
+
+IMPORTANT (Highly Recommended):
+    - Owner            (Person responsible for remediation)
+    - Component        (Affected library/framework/version)
+    - Remediation_Plan (Description of fix)
+
+OPTIONAL (For Enhanced Analysis):
+    - Exploitability   (Known/Proof of Concept/Unproven)
+    - CVSS_Score       (e.g., 7.5)
+    - Detection_Method (Manual/Automated/Reported)
+    - Compensating_Controls (If risk accepted)
+
+================================================================================
+DATA MAPPING EXAMPLES
+================================================================================
+
+FROM FORTIFY → TO DASHBOARD:
+
+Fortify Field               →  Dashboard Column
+IssueInstanceId             →  Vuln_ID
+CweId/IssueName             →  CVE
+Severity                    →  Severity (convert if needed)
+Application                 →  Product
+Status                      →  Status
+FoundDate                   →  Discovery_Date
+TODAY - FixedDate           →  Days_Overdue (calculate if fixed)
+TBD / Extract from Notes    →  Owner
+Component                   →  Component
+Notes/TBD                   →  Remediation_Plan
+
+FROM SONATYPE NEXUS IQ → TO DASHBOARD:
+
+Nexus IQ Field              →  Dashboard Column
+VulnerabilityReference      →  Vuln_ID
+CveId                       →  CVE
+Severity                    →  Severity
+ApplicationName             →  Product
+Status                      →  Status
+DiscoveredDate              →  Discovery_Date
+Component Name + Version    →  Component
+AssignedOwner               →  Owner
+RemediationAdvice           →  Remediation_Plan
+
+================================================================================
+CSV IMPORT PROCESS
+================================================================================
+
+1. Prepare your CSV file with required columns
+2. Ensure all date formats are YYYY-MM-DD
+3. Verify Severity values: "Critical", "High", "Medium", "Low"
+4. Save file as UTF-8 encoded
+5. Open consolidated_dashboard.html
+6. Navigate to "Import Data" section
+7. Click "Import CSV File"
+8. Select your prepared CSV
+9. Dashboard will auto-populate within seconds
+
+================================================================================
+AUTOMATED EXPORT OPTIONS
+================================================================================
+
+If available in your environment, use these automated approaches:
+
+FORTIFY API:
+    - Use Fortify SSC REST API to export programmatically
+    - Endpoint: /api/v1/issues
+    - Filter: status, severity, application
+    - Transform output to required CSV format
+
+SONATYPE NEXUS IQ API:
+    - Use Nexus IQ REST API
+    - Endpoint: /api/v2/reports/{id}/components
+    - Extract vulnerability data programmatically
+
+SCHEDULED EXPORTS:
+    - Configure daily/weekly Fortify reports via email
+    - Parse email attachments
+    - Auto-convert to dashboard CSV format
+
+================================================================================
+DATA VALIDATION CHECKLIST
+================================================================================
+
+Before importing CSV, verify:
+
+✓ All required columns present
+✓ No empty Vuln_ID cells
+✓ Severity values are exactly: Critical, High, Medium, Low
+✓ Product names are consistent (e.g., "Veggo" not "veggo" or "VEGGO")
+✓ Dates are YYYY-MM-DD format
+✓ Days_Overdue is numeric (0, 1, 2, etc.)
+✓ Status values are: Open, In Progress, Closed
+✓ No duplicate Vuln_IDs
+✓ File is UTF-8 encoded
+✓ No special characters in Product/Owner fields that could break CSV parsing
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+Issue: "Data not loading in dashboard"
+→ Check CSV format: Must be comma-separated, UTF-8 encoded
+→ Verify no missing headers
+→ Ensure no quotes or special chars in sensitive fields
+
+Issue: "Charts appear empty"
+→ Minimum 5 vulnerabilities needed for charts
+→ Use "Load Sample Data" button to test dashboard functionality
+
+Issue: "Dates not recognized"
+→ Use format: YYYY-MM-DD (e.g., 2024-02-15)
+→ No other date formats supported
+
+Issue: "Severity filter not working"
+→ Check exact spelling: "Critical", "High", "Medium", "Low"
+→ Values are case-sensitive
+
+================================================================================
+SUPPORT & ESCALATION
+================================================================================
+
+For issues exporting data from Fortify SSC:
+1. Contact your Security Tools Administrator
+2. Request Fortify SSC report with specified columns
+3. Share column mapping with administrator
+
+For integration with other tools:
+- Dashboard accepts any CSV with required columns
+- Custom export scripts can transform tool output to CSV format
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Extract data from your security systems using this guide
+2. Format as CSV with required columns
+3. Import into consolidated_dashboard.html
+4. Review automatically generated KPIs and visualizations
+5. Use dashboard for governance meetings and committee briefings
+6. Share interactive HTML with stakeholders
+7. Export summary reports as needed
+
+================================================================================
