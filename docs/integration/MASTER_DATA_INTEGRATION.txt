@@ -1,0 +1,551 @@
+================================================================================
+MASTER DATA INTEGRATION GUIDE
+Combining Fortify, Nexus IQ, and DevOps-Sec into One Dashboard
+================================================================================
+
+OVERVIEW
+========
+This guide shows how to integrate vulnerability data from all three sources
+to create a comprehensive, enterprise-wide security governance dashboard.
+
+Three Data Sources:
+1. Fortify SSC - Application vulnerability scanning
+2. Sonatype Nexus IQ - Dependency/SCA scanning  
+3. DevOps-Sec Portal - Aggregate security data
+
+Result: Single source of truth for all vulnerabilities
+
+================================================================================
+QUICK REFERENCE TABLE
+================================================================================
+
+Source          URL                              Data Type           Frequency
+─────────────────────────────────────────────────────────────────────────────
+Fortify SSC     https://soft-security.vermeg     SAST (static)       Weekly
+                .com/ssc/                        Component scan      
+                
+Nexus IQ        https://soft-security.vermeg     SCA (dependencies)  Daily
+                .com:8070/                       License scan
+                
+DevOps-Sec      https://devops-sec.vermeg.com/   Aggregated          Real-time
+                                                 (all scanners)
+
+================================================================================
+STEP 1: PREPARE YOUR DATA EXTRACTION SCRIPTS
+================================================================================
+
+Create project directory:
+```bash
+mkdir -p /opt/security-dashboard
+cd /opt/security-dashboard
+
+# Create subdirectories
+mkdir -p scripts data/raw data/processed reports
+```
+
+Files needed:
+```
+/opt/security-dashboard/
+├── scripts/
+│   ├── extract_fortify.py
+│   ├── extract_nexus_iq.py
+│   ├── extract_devops_sec.py
+│   ├── combine_datasources.py
+│   └── validate_data.py
+├── config/
+│   ├── fortify_config.json
+│   ├── nexus_config.json
+│   └── devops_config.json
+├── data/
+│   ├── raw/
+│   │   ├── fortify_raw.csv
+│   │   ├── nexus_raw.csv
+│   │   └── devops_raw.csv
+│   └── processed/
+│       └── dashboard_vulnerabilities.csv
+└── README.md
+```
+
+================================================================================
+STEP 2: CONFIGURE DATA SOURCES
+================================================================================
+
+Create fortify_config.json:
+```json
+{
+  "name": "Fortify SSC",
+  "url": "https://soft-security.vermeg.com/ssc",
+  "method": "api",
+  "api_token": "YOUR_FORTIFY_API_TOKEN",
+  "frequency": "weekly",
+  "enabled": true,
+  "output_file": "data/raw/fortify_raw.csv",
+  "description": "Static application security testing"
+}
+```
+
+Create nexus_config.json:
+```json
+{
+  "name": "Sonatype Nexus IQ",
+  "url": "https://soft-security.vermeg.com:8070",
+  "method": "api",
+  "username": "YOUR_NEXUS_USERNAME",
+  "password": "YOUR_NEXUS_PASSWORD",
+  "frequency": "daily",
+  "enabled": true,
+  "output_file": "data/raw/nexus_raw.csv",
+  "description": "Software composition analysis (dependencies)"
+}
+```
+
+Create devops_config.json:
+```json
+{
+  "name": "DevOps-Sec Portal",
+  "url": "https://devops-sec.vermeg.com",
+  "method": "api",
+  "api_key": "YOUR_DEVOPS_API_KEY",
+  "frequency": "realtime",
+  "enabled": true,
+  "output_file": "data/raw/devops_raw.csv",
+  "description": "Aggregated security data"
+}
+```
+
+================================================================================
+STEP 3: CREATE MASTER EXTRACTION SCRIPT
+================================================================================
+
+```python
+#!/usr/bin/env python3
+"""
+Master Data Extractor
+Pulls vulnerability data from all three sources
+"""
+
+import json
+import subprocess
+import os
+from datetime import datetime
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/extraction.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+class MasterExtractor:
+    def __init__(self):
+        self.config_dir = 'config'
+        self.data_raw_dir = 'data/raw'
+        self.data_processed_dir = 'data/processed'
+        self.timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+        
+    def extract_all(self):
+        """Extract from all sources"""
+        logger.info("=" * 60)
+        logger.info("Starting master vulnerability extraction")
+        logger.info("=" * 60)
+        
+        results = {}
+        
+        # Extract Fortify
+        logger.info("\n[1/3] Extracting Fortify data...")
+        try:
+            result = self._extract_fortify()
+            results['fortify'] = result
+            logger.info(f"✓ Fortify: {result['count']} vulnerabilities")
+        except Exception as e:
+            logger.error(f"✗ Fortify extraction failed: {e}")
+            results['fortify'] = {'success': False, 'error': str(e)}
+        
+        # Extract Nexus IQ
+        logger.info("\n[2/3] Extracting Nexus IQ data...")
+        try:
+            result = self._extract_nexus_iq()
+            results['nexus_iq'] = result
+            logger.info(f"✓ Nexus IQ: {result['count']} vulnerabilities")
+        except Exception as e:
+            logger.error(f"✗ Nexus IQ extraction failed: {e}")
+            results['nexus_iq'] = {'success': False, 'error': str(e)}
+        
+        # Extract DevOps-Sec
+        logger.info("\n[3/3] Extracting DevOps-Sec data...")
+        try:
+            result = self._extract_devops_sec()
+            results['devops_sec'] = result
+            logger.info(f"✓ DevOps-Sec: {result['count']} vulnerabilities")
+        except Exception as e:
+            logger.error(f"✗ DevOps-Sec extraction failed: {e}")
+            results['devops_sec'] = {'success': False, 'error': str(e)}
+        
+        return results
+    
+    def _extract_fortify(self):
+        """Run Fortify extraction script"""
+        logger.info("Running Fortify extraction script...")
+        subprocess.run(['python3', 'scripts/extract_fortify.py'])
+        
+        return {
+            'success': True,
+            'file': f'{self.data_raw_dir}/fortify_raw.csv',
+            'count': self._count_csv_rows(f'{self.data_raw_dir}/fortify_raw.csv')
+        }
+    
+    def _extract_nexus_iq(self):
+        """Run Nexus IQ extraction script"""
+        logger.info("Running Nexus IQ extraction script...")
+        subprocess.run(['python3', 'scripts/extract_nexus_iq.py'])
+        
+        return {
+            'success': True,
+            'file': f'{self.data_raw_dir}/nexus_raw.csv',
+            'count': self._count_csv_rows(f'{self.data_raw_dir}/nexus_raw.csv')
+        }
+    
+    def _extract_devops_sec(self):
+        """Run DevOps-Sec extraction script"""
+        logger.info("Running DevOps-Sec extraction script...")
+        subprocess.run(['python3', 'scripts/extract_devops_sec.py'])
+        
+        return {
+            'success': True,
+            'file': f'{self.data_raw_dir}/devops_raw.csv',
+            'count': self._count_csv_rows(f'{self.data_raw_dir}/devops_raw.csv')
+        }
+    
+    def _count_csv_rows(self, filepath):
+        """Count rows in CSV file"""
+        try:
+            with open(filepath) as f:
+                return sum(1 for _ in f) - 1  # Subtract header
+        except:
+            return 0
+
+def main():
+    extractor = MasterExtractor()
+    results = extractor.extract_all()
+    
+    # Summary
+    logger.info("\n" + "=" * 60)
+    logger.info("EXTRACTION SUMMARY")
+    logger.info("=" * 60)
+    
+    total = sum([r.get('count', 0) for r in results.values() if r.get('success')])
+    logger.info(f"Total vulnerabilities extracted: {total}")
+    
+    for source, result in results.items():
+        if result.get('success'):
+            logger.info(f"✓ {source}: {result['count']} vulnerabilities")
+        else:
+            logger.info(f"✗ {source}: {result.get('error', 'Unknown error')}")
+    
+    logger.info("\nNext step: Run combine_datasources.py")
+
+if __name__ == '__main__':
+    main()
+```
+
+================================================================================
+STEP 4: CREATE DATA COMBINATION/DEDUPLICATION SCRIPT
+================================================================================
+
+```python
+#!/usr/bin/env python3
+"""
+Combine vulnerability data from all three sources
+Deduplicate and produce single authoritative dataset
+"""
+
+import pandas as pd
+import json
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+class DataCombiner:
+    def __init__(self):
+        self.fortify_file = 'data/raw/fortify_raw.csv'
+        self.nexus_file = 'data/raw/nexus_raw.csv'
+        self.devops_file = 'data/raw/devops_raw.csv'
+        
+    def combine(self):
+        """Combine all three data sources"""
+        logger.info("Combining data from all sources...")
+        
+        # Load each source
+        fortify_df = pd.read_csv(self.fortify_file)
+        nexus_df = pd.read_csv(self.nexus_file)
+        devops_df = pd.read_csv(self.devops_file)
+        
+        logger.info(f"Fortify: {len(fortify_df)} rows")
+        logger.info(f"Nexus IQ: {len(nexus_df)} rows")
+        logger.info(f"DevOps-Sec: {len(devops_df)} rows")
+        
+        # Add source tracking
+        fortify_df['source'] = 'Fortify SSC'
+        nexus_df['source'] = 'Nexus IQ'
+        devops_df['source'] = 'DevOps-Sec'
+        
+        # Combine
+        combined = pd.concat([fortify_df, nexus_df, devops_df], ignore_index=True)
+        logger.info(f"Combined (before dedup): {len(combined)} rows")
+        
+        # Deduplicate by CVE + Product (keep first occurrence)
+        combined = combined.drop_duplicates(
+            subset=['CVE', 'Product'],
+            keep='first'
+        )
+        logger.info(f"After deduplication: {len(combined)} unique vulnerabilities")
+        
+        # Validate data
+        combined = self._validate_data(combined)
+        logger.info(f"After validation: {len(combined)} rows")
+        
+        # Sort by priority
+        combined = self._sort_by_priority(combined)
+        
+        # Save
+        output_file = f"data/processed/dashboard_vulnerabilities_{datetime.now().strftime('%Y-%m-%d')}.csv"
+        combined.to_csv(output_file, index=False)
+        logger.info(f"✓ Saved combined data to {output_file}")
+        
+        return combined
+    
+    def _validate_data(self, df):
+        """Validate and clean data"""
+        # Ensure valid severity
+        valid_severities = ['Critical', 'High', 'Medium', 'Low']
+        df = df[df['Severity'].isin(valid_severities)]
+        
+        # Remove rows missing required fields
+        required_fields = ['Vuln_ID', 'Product', 'Severity']
+        df = df.dropna(subset=required_fields)
+        
+        return df
+    
+    def _sort_by_priority(self, df):
+        """Sort by severity and days overdue"""
+        severity_order = {'Critical': 0, 'High': 1, 'Medium': 2, 'Low': 3}
+        df['severity_sort'] = df['Severity'].map(severity_order)
+        df['Days_Overdue'] = pd.to_numeric(df['Days_Overdue'], errors='coerce').fillna(0)
+        
+        df = df.sort_values(
+            ['severity_sort', 'Days_Overdue'],
+            ascending=[True, False]
+        )
+        
+        return df.drop('severity_sort', axis=1)
+    
+    def generate_summary(self, combined_df):
+        """Generate summary statistics"""
+        summary = {
+            'timestamp': datetime.now().isoformat(),
+            'total_vulnerabilities': len(combined_df),
+            'by_severity': combined_df['Severity'].value_counts().to_dict(),
+            'by_product': combined_df['Product'].value_counts().to_dict(),
+            'by_source': combined_df['source'].value_counts().to_dict(),
+            'overdue_count': len(combined_df[combined_df['Days_Overdue'] > 0])
+        }
+        
+        return summary
+
+def main():
+    combiner = DataCombiner()
+    combined = combiner.combine()
+    summary = combiner.generate_summary(combined)
+    
+    print("\n" + "=" * 60)
+    print("COMBINATION SUMMARY")
+    print("=" * 60)
+    print(f"Total vulnerabilities: {summary['total_vulnerabilities']}")
+    print(f"\nBy Severity:")
+    for sev, count in summary['by_severity'].items():
+        print(f"  {sev}: {count}")
+    print(f"\nBy Source:")
+    for src, count in summary['by_source'].items():
+        print(f"  {src}: {count}")
+    print(f"\nOverdue: {summary['overdue_count']}")
+
+if __name__ == '__main__':
+    main()
+```
+
+================================================================================
+STEP 5: CREATE SCHEDULED PIPELINE
+================================================================================
+
+Create cron job (runs daily at 6:00 AM):
+
+```bash
+#!/bin/bash
+# /opt/security-dashboard/daily_extraction.sh
+
+set -e
+
+LOG_FILE="/var/log/security-dashboard/extraction_$(date +%Y-%m-%d).log"
+SCRIPT_DIR="/opt/security-dashboard"
+
+echo "Starting daily vulnerability extraction at $(date)" >> $LOG_FILE
+
+cd $SCRIPT_DIR
+
+# Step 1: Extract from all sources
+echo "Step 1: Extracting data..." >> $LOG_FILE
+python3 scripts/master_extractor.py >> $LOG_FILE 2>&1
+
+# Step 2: Combine and deduplicate
+echo "Step 2: Combining data..." >> $LOG_FILE
+python3 scripts/combine_datasources.py >> $LOG_FILE 2>&1
+
+# Step 3: Validate quality
+echo "Step 3: Validating data..." >> $LOG_FILE
+python3 scripts/validate_data.py >> $LOG_FILE 2>&1
+
+# Step 4: Copy to dashboard location
+echo "Step 4: Copying to dashboard..." >> $LOG_FILE
+cp data/processed/dashboard_vulnerabilities_*.csv /var/www/dashboards/
+chown www-data:www-data /var/www/dashboards/dashboard_vulnerabilities*.csv
+
+# Step 5: Generate reports
+echo "Step 5: Generating reports..." >> $LOG_FILE
+python3 scripts/generate_reports.py >> $LOG_FILE 2>&1
+
+echo "Extraction complete at $(date)" >> $LOG_FILE
+```
+
+Add to crontab:
+```bash
+crontab -e
+# Add line:
+0 6 * * * /opt/security-dashboard/daily_extraction.sh
+```
+
+================================================================================
+STEP 6: LOAD INTO DASHBOARD
+================================================================================
+
+Once combined CSV is ready:
+
+1. Open dashboard_live_demo.html in browser
+2. Scroll to "Import Data" section
+3. Click "Import CSV File"
+4. Select: data/processed/dashboard_vulnerabilities_[DATE].csv
+5. Dashboard automatically updates with real data!
+
+Or load automatically via URL parameter:
+```html
+dashboard_live_demo.html?data=data/processed/dashboard_vulnerabilities_latest.csv
+```
+
+================================================================================
+STEP 7: CONTINUOUS UPDATES
+================================================================================
+
+To keep dashboard always updated:
+
+Option A: Manual refresh
+- Run daily extraction script
+- Manually import latest CSV
+
+Option B: Automated (recommended)
+- Dashboard reads from shared location
+- Updated CSV replaces old one daily
+- Browser auto-refreshes
+
+Option C: API-based
+- Dashboard connects directly to each data source
+- Pulls latest data on demand
+- Real-time updates
+
+================================================================================
+MONITORING & TROUBLESHOOTING
+================================================================================
+
+Check extraction logs:
+```bash
+tail -f /var/log/security-dashboard/extraction_*.log
+```
+
+Verify data quality:
+```bash
+python3 scripts/validate_data.py --check-latest
+```
+
+Compare data sources:
+```bash
+# Show differences
+diff <(cut -d, -f2 data/raw/fortify_raw.csv | sort) \
+     <(cut -d, -f2 data/raw/nexus_raw.csv | sort)
+```
+
+Monitor pipeline:
+```bash
+# List latest extractions
+ls -lth data/processed/
+```
+
+================================================================================
+FINAL WORKFLOW
+================================================================================
+
+Daily automated process:
+
+6:00 AM  - Run daily_extraction.sh
+6:15 AM  - Extract Fortify (5 min)
+6:20 AM  - Extract Nexus IQ (5 min)
+6:25 AM  - Extract DevOps-Sec (5 min)
+6:30 AM  - Combine & deduplicate (2 min)
+6:32 AM  - Validate data (2 min)
+6:34 AM  - Copy to dashboard (1 min)
+6:35 AM  - Generate reports (5 min)
+6:40 AM  - Complete, dashboard ready!
+
+Result: Fresh vulnerability data every morning in dashboard!
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. ✓ Set up directory structure
+2. ✓ Create configuration files
+3. ✓ Download/customize extraction scripts
+4. ✓ Test each extraction method
+5. ✓ Test data combination
+6. ✓ Set up cron job
+7. ✓ Load combined CSV into dashboard
+8. ✓ Monitor and validate daily
+
+Your dashboard is now an enterprise-grade security system!
+
+================================================================================
+VERSION CONTROL
+================================================================================
+
+Track your integration setup in Git:
+
+```bash
+git init /opt/security-dashboard
+git add scripts/ config/ README.md
+git commit -m "Initial security dashboard integration setup"
+git remote add origin https://github.com/your-org/security-dashboard
+git push -u origin main
+```
+
+Tag releases:
+```bash
+git tag -a v1.0 -m "First production integration"
+git push origin v1.0
+```
+
+================================================================================
+Version 1.0 | May 2024
+================================================================================

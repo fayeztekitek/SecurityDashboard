@@ -1,0 +1,467 @@
+================================================================================
+SONATYPE NEXUS IQ - DATA INTEGRATION GUIDE
+Injecting Real Dependency Vulnerability Data into Security Dashboard
+================================================================================
+
+OVERVIEW
+========
+Sonatype Nexus IQ provides software composition analysis (SCA) and identifies
+vulnerable dependencies. This guide shows how to export and integrate that data.
+
+Methods:
+1. MANUAL EXPORT (UI-based)
+2. NEXUS IQ API (Programmatic)
+3. NEXUS IQ CLI (Command-line)
+
+================================================================================
+METHOD 1: MANUAL EXPORT FROM NEXUS IQ UI
+================================================================================
+
+STEP 1.1: Access Nexus IQ
+   URL: https://soft-security.vermeg.com:8070/ (or your Nexus IQ instance)
+   
+   Login with appropriate credentials
+   (Contact your security tools administrator if you don't have access)
+
+STEP 1.2: Navigate to Reports
+   1. Log in to Nexus IQ
+   2. Go to: Dashboard → Reports
+   3. Or: Manage → Reports
+   4. Select: "Vulnerability Report" or "Security Report"
+
+STEP 1.3: Filter by Application
+   
+   Select scope:
+   ✓ Application: Choose your applications (Veggo, Megara, Colline, etc.)
+   ✓ Stage: Select (Build, Stage, Release)
+   ✓ Date: Last scan or custom date
+   ✓ Severity: All or High/Critical only
+   
+   Available applications to check:
+   - Veggo
+   - Megara
+   - Colline
+   - Digital Collateral
+   - Digital Insurance
+
+STEP 1.4: Review Vulnerabilities
+   
+   Nexus IQ displays:
+   ✓ Component Name (library/dependency)
+   ✓ Component Version
+   ✓ Vulnerability ID (CVE)
+   ✓ Severity
+   ✓ CVSS Score
+   ✓ Threat Score
+   ✓ Policy Violations
+
+STEP 1.5: Export Report
+   
+   Method A: Built-in Export
+   1. Click "Export" button (usually top right)
+   2. Select format: CSV or Excel
+   3. Choose location: Save to Downloads
+   4. Filename: nexus_iq_export_[DATE].csv
+   
+   Method B: Scheduled Reports
+   1. Go to: Reports → Scheduled Reports
+   2. Click "New Scheduled Report"
+   3. Configure:
+      - Frequency: Daily/Weekly/Monthly
+      - Format: CSV
+      - Recipients: Your email
+   4. Nexus IQ emails CSV automatically
+
+STEP 1.6: Map Nexus IQ Fields to Dashboard Format
+   
+   Nexus IQ Field              →    Dashboard CSV Column
+   ─────────────────────────────────────────────────────
+   Vulnerability ID / CVE      →    CVE
+   CVE Identifier              →    CVE
+   Component Name + Version    →    Component
+   Application Name            →    Product
+   Severity                    →    Severity
+   (Need to add manually)      →    Vuln_ID (generate)
+   (Need to calculate)         →    Discovery_Date (report date or scan date)
+   (Need to add manually)      →    Days_Overdue (calculate from scan date)
+   (Need to add manually)      →    Owner (from team assignment)
+   (From Nexus IQ)            →    Status (Open/Remediated/Waived)
+   Remediation Advice         →    Remediation_Plan
+
+STEP 1.7: Transform in Excel/Google Sheets
+   
+   1. Open Nexus IQ CSV export
+   2. Add columns for dashboard format:
+      A: Vuln_ID (=CONCATENATE("VUL-", ROW()-1))
+      B: CVE (copy from "Vulnerability ID")
+      C: Severity (map: Critical→Critical, High→High, etc.)
+      D: Product (copy from "Application")
+      E: Component (copy from "Component Name")
+      F: Discovery_Date (=TODAY() or scan date, format YYYY-MM-DD)
+      G: Days_Overdue (calculate based on SLA)
+      H: Owner (add team/owner manually)
+      I: Status (map from Nexus IQ status)
+      J: Remediation_Plan (copy from "Remediation Advice")
+   
+   3. Save as CSV (UTF-8)
+   4. Name: nexus_iq_vulnerabilities.csv
+
+STEP 1.8: Load into Dashboard
+   
+   1. Open dashboard_live_demo.html in browser
+   2. Click "Import CSV File"
+   3. Select: nexus_iq_vulnerabilities.csv
+   4. Dashboard updates with real Nexus IQ data!
+
+================================================================================
+METHOD 2: NEXUS IQ API EXPORT (Programmatic)
+================================================================================
+
+STEP 2.1: Generate Nexus IQ API Token
+   
+   1. Log into Nexus IQ
+   2. Click your profile (top right) → User Profile
+   3. Go to: Authentication Token section
+   4. Click "Generate New Token" or "Reset Token"
+   5. Copy token (format: base64 encoded)
+   6. Save securely
+
+STEP 2.2: Python Script for Nexus IQ Data Extraction
+   
+   Create file: extract_nexus_iq_data.py
+   
+```python
+#!/usr/bin/env python3
+"""
+Sonatype Nexus IQ - Dashboard Data Extraction
+Exports vulnerability data to CSV format
+"""
+
+import requests
+import csv
+import json
+import argparse
+from datetime import datetime
+from typing import List, Dict, Any
+import base64
+
+class NexusIQExtractor:
+    def __init__(self, base_url: str, username: str, password: str):
+        self.base_url = base_url.rstrip('/')
+        self.session = requests.Session()
+        
+        # Setup Basic Auth
+        auth_string = f"{username}:{password}"
+        auth_bytes = auth_string.encode('utf-8')
+        auth_b64 = base64.b64encode(auth_bytes).decode('utf-8')
+        self.session.headers.update({'Authorization': f'Basic {auth_b64}'})
+    
+    def get_applications(self) -> List[Dict[str, Any]]:
+        """Get all applications"""
+        try:
+            resp = self.session.get(f"{self.base_url}/api/v2/applications")
+            resp.raise_for_status()
+            return resp.json().get('applications', [])
+        except Exception as e:
+            print(f"Error fetching applications: {e}")
+            return []
+    
+    def get_vulnerabilities(self, app_id: str) -> List[Dict[str, Any]]:
+        """Get vulnerabilities for application"""
+        try:
+            # Get latest report for application
+            resp = self.session.get(
+                f"{self.base_url}/api/v2/applications/{app_id}/reports"
+            )
+            resp.raise_for_status()
+            reports = resp.json().get('reports', [])
+            
+            if not reports:
+                return []
+            
+            latest_report = reports[0]
+            report_id = latest_report['id']
+            
+            # Get components from report
+            resp = self.session.get(
+                f"{self.base_url}/api/v2/reports/{report_id}/components"
+            )
+            resp.raise_for_status()
+            components = resp.json().get('components', [])
+            
+            vulnerabilities = []
+            for component in components:
+                if 'vulnerabilities' in component:
+                    for vuln in component['vulnerabilities']:
+                        vuln['applicationId'] = app_id
+                        vuln['componentName'] = component.get('componentIdentifier', {}).get('name')
+                        vuln['componentVersion'] = component.get('componentIdentifier', {}).get('version')
+                        vulnerabilities.append(vuln)
+            
+            return vulnerabilities
+        
+        except Exception as e:
+            print(f"Error fetching vulnerabilities: {e}")
+            return []
+    
+    def convert_to_dashboard_format(self, vulns: List[Dict]) -> List[Dict]:
+        """Convert to dashboard CSV format"""
+        dashboard_vulns = []
+        
+        severity_map = {
+            'CRITICAL': 'Critical',
+            'HIGH': 'High',
+            'MEDIUM': 'Medium',
+            'LOW': 'Low'
+        }
+        
+        for i, vuln in enumerate(vulns, 1):
+            # Extract threat level as severity if not present
+            threat_level = vuln.get('threatLevel', 'High')
+            severity = severity_map.get(threat_level, 'Medium')
+            
+            # Get CVE
+            cve = ''
+            if 'cve' in vuln:
+                cve = vuln['cve']
+            elif 'reference' in vuln:
+                ref = vuln['reference']
+                if isinstance(ref, dict):
+                    cve = ref.get('id', '')
+            
+            dashboard_vuln = {
+                'Vuln_ID': f"VUL-{datetime.now().year}-{i:04d}",
+                'CVE': cve,
+                'Severity': severity,
+                'Product': vuln.get('applicationName', 'Unknown'),
+                'Component': f"{vuln.get('componentName', 'Unknown')} {vuln.get('componentVersion', '')}",
+                'Discovery_Date': datetime.now().strftime('%Y-%m-%d'),
+                'Days_Overdue': '0',
+                'Owner': 'To Be Assigned',
+                'Status': 'Open',
+                'Remediation_Plan': f"Update {vuln.get('componentName')} to patched version"
+            }
+            
+            dashboard_vulns.append(dashboard_vuln)
+        
+        return dashboard_vulns
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Extract vulnerability data from Sonatype Nexus IQ'
+    )
+    
+    parser.add_argument('--nexus-url', required=True,
+                       help='Nexus IQ URL (e.g., https://nexus-iq.company.com)')
+    parser.add_argument('--username', required=True,
+                       help='Nexus IQ username')
+    parser.add_argument('--password', required=True,
+                       help='Nexus IQ password or token')
+    parser.add_argument('--output', default='nexus_iq_vulnerabilities.csv',
+                       help='Output CSV file')
+    
+    args = parser.parse_args()
+    
+    print("[*] Connecting to Nexus IQ...")
+    extractor = NexusIQExtractor(args.nexus_url, args.username, args.password)
+    
+    print("[*] Fetching applications...")
+    applications = extractor.get_applications()
+    print(f"[+] Found {len(applications)} applications")
+    
+    all_vulns = []
+    for app in applications:
+        app_id = app['id']
+        app_name = app['name']
+        print(f"[*] Fetching vulnerabilities for {app_name}...")
+        
+        vulns = extractor.get_vulnerabilities(app_id)
+        for vuln in vulns:
+            vuln['applicationName'] = app_name
+        all_vulns.extend(vulns)
+    
+    print(f"[*] Total vulnerabilities found: {len(all_vulns)}")
+    
+    print("[*] Converting to dashboard format...")
+    dashboard_vulns = extractor.convert_to_dashboard_format(all_vulns)
+    
+    print("[*] Writing to CSV...")
+    fieldnames = ['Vuln_ID', 'CVE', 'Severity', 'Product', 'Component',
+                  'Discovery_Date', 'Days_Overdue', 'Owner', 'Status', 'Remediation_Plan']
+    
+    with open(args.output, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(dashboard_vulns)
+    
+    print(f"[✓] Success! Wrote {len(dashboard_vulns)} vulnerabilities to {args.output}")
+
+if __name__ == '__main__':
+    main()
+```
+
+STEP 2.3: Run the Script
+   
+   ```bash
+   python3 extract_nexus_iq_data.py \
+       --nexus-url https://soft-security.vermeg.com:8070 \
+       --username your_username \
+       --password your_password \
+       --output nexus_iq_data.csv
+   ```
+
+STEP 2.4: Load into Dashboard
+   
+   Import the generated CSV into dashboard as before
+
+================================================================================
+METHOD 3: NEXUS IQ CLI (If Installed)
+================================================================================
+
+STEP 3.1: Install Nexus IQ CLI
+   
+   ```bash
+   # Download
+   wget https://download.sonatype.com/nexus/3/nexus-iq-cli-1.141.0-unix.tar.gz
+   tar -xzf nexus-iq-cli-1.141.0-unix.tar.gz
+   ```
+
+STEP 3.2: Run Scan (generates report)
+   
+   ```bash
+   ./nexus-iq-cli -u admin:password123 -x \
+       --application-id veggo \
+       --report-format=json \
+       --output-file=report.json \
+       .
+   ```
+
+STEP 3.3: Parse JSON Report to CSV
+   
+   ```python
+   import json
+   import csv
+   
+   with open('report.json') as f:
+       data = json.load(f)
+   
+   vulns = []
+   for component in data['components']:
+       for vuln in component.get('vulnerabilities', []):
+           vulns.append({
+               'Vuln_ID': f"VUL-{vuln['reference']['id']}",
+               'CVE': vuln['reference']['id'],
+               'Severity': vuln['threatLevel'],
+               # ... map other fields
+           })
+   ```
+
+================================================================================
+NEXUS IQ DATA QUALITY NOTES
+================================================================================
+
+Important considerations:
+
+1. TIMING
+   - Nexus IQ shows vulnerabilities at scan time
+   - Discovery_Date = last scan date
+   - Consider when scan last ran
+
+2. COMPONENT VERSIONING
+   - Include version in Component field
+   - Example: "OpenSSL 1.1.1" not just "OpenSSL"
+   - Helps with remediation tracking
+
+3. SEVERITY MAPPING
+   - Nexus IQ uses: CRITICAL, HIGH, MEDIUM, LOW
+   - Maps directly to dashboard: Critical, High, Medium, Low
+
+4. CVE EXTRACTION
+   - Most Nexus IQ vulnerabilities have CVE IDs
+   - Format: CVE-YYYY-XXXX
+   - If missing, reference field may have alternative ID
+
+5. STATUS TRACKING
+   - Nexus IQ shows "Open", "Remediated", "Waived"
+   - Map to dashboard "Open/In Progress/Closed"
+
+================================================================================
+NEXUS IQ API REFERENCE
+================================================================================
+
+Key endpoints:
+
+1. Get all applications:
+   GET /api/v2/applications
+
+2. Get application reports:
+   GET /api/v2/applications/{appId}/reports
+
+3. Get report components:
+   GET /api/v2/reports/{reportId}/components
+
+4. Get report details:
+   GET /api/v2/reports/{reportId}
+
+API Docs: https://help.sonatype.com/iqserver/api
+
+================================================================================
+TROUBLESHOOTING NEXUS IQ
+================================================================================
+
+PROBLEM: "Authentication failed"
+SOLUTION:
+   - Verify username/password correct
+   - Check Nexus IQ account has API access
+   - Use API token instead of password if available
+
+PROBLEM: "No applications found"
+SOLUTION:
+   - User may not have permission to view apps
+   - Check Nexus IQ role permissions
+   - Contact Nexus IQ administrator
+
+PROBLEM: "No vulnerabilities found"
+SOLUTION:
+   - Application may not have been scanned
+   - Check scan results in UI
+   - Ensure components have been analyzed
+
+================================================================================
+INTEGRATING NEXUS IQ WITH FORTIFY DATA
+================================================================================
+
+Since you use both Fortify and Nexus IQ, combine both data sources:
+
+1. Export Fortify data (application vulnerabilities)
+2. Export Nexus IQ data (dependency vulnerabilities)
+3. Merge CSVs (ensure Vuln_ID is unique)
+4. Import combined CSV to dashboard
+
+Combined dashboard will show:
+- Application vulns from Fortify
+- Dependency vulns from Nexus IQ
+- Complete vulnerability picture
+
+Merge example:
+fortify_vulns = 150
+nexus_iq_vulns = 45
+merged_vulns = 195
+
+================================================================================
+NEXT STEPS
+================================================================================
+
+1. Choose extraction method (Manual, API, or CLI)
+2. Export Nexus IQ data
+3. Transform to dashboard CSV format
+4. Validate data quality
+5. Import into dashboard
+6. Combine with Fortify data
+7. Set up automated schedules
+
+Your dashboard now has comprehensive SCA data!
+
+================================================================================
+Version 1.0 | May 2024
+================================================================================
